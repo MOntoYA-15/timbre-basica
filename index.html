@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control - Timbre</title>
+    <title>Panel de Control - Timbre BÁSICA</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <style>
-        :root { --primary: #2563eb; --danger: #dc2626; --success: #16a34a; --bg: #f1f5f9; }
+        /* He cambiado el color primary a Púrpura para que lo distingas del otro sistema */
+        :root { --primary: #8b5cf6; --danger: #dc2626; --success: #16a34a; --bg: #f1f5f9; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
         .container { width: 100%; max-width: 450px; padding: 20px; }
         .card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
@@ -31,8 +32,8 @@
 
 <div class="container">
     <div id="login-box" class="card">
-        <h2>Acceso</h2>
-        <p style="text-align: center; color: #64748b;">Panel de Control Timbre</p>
+        <h2>Acceso BÁSICA</h2>
+        <p style="text-align: center; color: #64748b;">Panel de Control Lugar 2</p>
         <div id="error-msg"></div>
         <input type="email" id="user-email" placeholder="Correo (admin@timbre.com)">
         <input type="password" id="user-pass" placeholder="Contraseña">
@@ -42,7 +43,7 @@
     <div id="panel-box" class="card hidden">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <button class="btn btn-logout" onclick="handleLogout()">Cerrar Sesión</button>
-            <span style="font-size: 0.8rem; color: #64748b;">Sistema timbre v4.8</span>
+            <span style="font-size: 0.8rem; color: #64748b;">Sistema timbre v4.8 B</span>
         </div>
 
         <button id="btn-maestro" class="btn" onclick="toggleMaestro()">
@@ -66,12 +67,12 @@
 </div>
 
 <script>
-    // CONFIGURACIÓN DE TU PROYECTO
+    // NUEVA CONFIGURACIÓN VERIFICADA PARA LUGAR 2
     const firebaseConfig = {
-        apiKey: "AIzaSyAbTb-cXeJmmPprRaVTqSyBiEyoEGv93f0",
-        authDomain: "sistematimbre.firebaseapp.com",
-        databaseURL: "https://sistematimbre-default-rtdb.firebaseio.com",
-        projectId: "sistematimbre"
+        apiKey: "AIzaSyAnGzdBBLCTPIbBPg4gbprpSm-mJnkDWSo",
+        authDomain: "sistema-timbre-basica.firebaseapp.com",
+        databaseURL: "https://sistema-timbre-basica-default-rtdb.firebaseio.com",
+        projectId: "sistema-timbre-basica"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -97,7 +98,7 @@
         const pass = document.getElementById('user-pass').value;
         const errorDiv = document.getElementById('error-msg');
         auth.signInWithEmailAndPassword(email, pass).catch(err => {
-            errorDiv.innerText = "Acceso denegado: Datos incorrectos";
+            errorDiv.innerText = "Acceso denegado: Datos incorrectos en Proyecto Básica";
         });
     }
 
@@ -105,9 +106,8 @@
 
     // --- LÓGICA DEL PANEL ---
     function startListening() {
-        // Escuchar Estado Maestro (Activado/Desactivado)
         db.ref('estado_maestro').on('value', snapshot => {
-            estadoMaestro = snapshot.val() !== false; // true por defecto
+            estadoMaestro = snapshot.val() !== false;
             const btn = document.getElementById('btn-maestro');
             if (estadoMaestro) {
                 btn.innerText = "🟢 SISTEMA: ACTIVADO";
@@ -118,7 +118,6 @@
             }
         });
 
-        // Escuchar Horarios
         db.ref('timbres').on('value', snapshot => {
             const listDiv = document.getElementById('lista-toques');
             listDiv.innerHTML = '';
@@ -154,7 +153,6 @@
 
     function manualRing() {
         db.ref('manual').set(true); 
-        // El ESP32 lo regresará a false automáticamente al sonar
     }
 
     function syncRTC() {
@@ -163,9 +161,8 @@
             h: d.getHours(), m: d.getMinutes(), s: d.getSeconds(),
             d: d.getDate(), mes: d.getMonth() + 1, a: d.getFullYear()
         });
-        alert("Hora del sistema actualizada con éxito.");
+        alert("Hora de Proyecto Básica sincronizada.");
     }
 </script>
 </body>
 </html>
-
