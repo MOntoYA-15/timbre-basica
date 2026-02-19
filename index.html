@@ -14,7 +14,7 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
         .container { width: 100%; max-width: 450px; padding: 20px; }
         .card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
-        h2, h3 { margin-top: 0; color: #1e293b; text-align: center; }
+        h2, h4 { margin-top: 0; color: #1e293b; text-align: center; }
         input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
         .btn { border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; color: white; width: 100%; transition: 0.3s; margin-top: 10px; }
         .btn-blue { background: var(--primary); }
@@ -22,7 +22,14 @@
         .btn-red { background: var(--danger); }
         .btn-logout { background: #64748b; font-size: 0.8rem; width: auto; padding: 5px 15px; }
         .hidden { display: none; }
+        
+        /* Estilos para la lista y botones de acción */
         .toque-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 1.1rem; }
+        .actions { display: flex; gap: 10px; }
+        .btn-action { background: none; border: none; cursor: pointer; font-weight: bold; font-size: 0.9rem; padding: 5px; }
+        .edit-input { width: 100px; padding: 5px; margin: 0; font-size: 1rem; }
+        
+        #status-sync { font-size: 0.75rem; text-align: center; color: #64748b; margin-top: 10px; }
         #error-msg { color: var(--danger); font-size: 0.85rem; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
@@ -41,17 +48,14 @@
     <div id="panel-box" class="card hidden">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <button class="btn btn-logout" onclick="handleLogout()">Cerrar Sesión</button>
-            <span style="font-size: 0.8rem; color: #64748b;">Sistema Timbre Básica v8.4</span>
+            <span style="font-size: 0.8rem; color: #64748b;">Sistema Timbre Básica v8.6</span>
         </div>
 
-        <button id="btn-maestro" class="btn" onclick="toggleMaestro()">
-            Verificando sistema...
-        </button>
+        <button id="btn-maestro" class="btn" onclick="toggleMaestro()">Verificando sistema...</button>
 
         <div style="margin: 20px 0;">
             <h4 style="margin-bottom: 10px;">Horarios Programados</h4>
-            <div id="lista-toques" style="max-height: 250px; overflow-y: auto; border: 1px solid #f1f5f9; border-radius: 8px;">
-                </div>
+            <div id="lista-toques" style="max-height: 250px; overflow-y: auto; border: 1px solid #f1f5f9; border-radius: 8px;"></div>
         </div>
 
         <input type="time" id="nuevo-horario">
@@ -61,6 +65,7 @@
             <button class="btn btn-red" onclick="manualRing()">Toque Manual</button>
             <button class="btn btn-blue" style="background: #8b5cf6;" onclick="syncRTC()">Sincronizar</button>
         </div>
+        <div id="status-sync">Verificando última sincronización...</div>
     </div>
 </div>
 
@@ -76,15 +81,14 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
-
     let estadoMaestro = true;
 
-    // --- GESTIÓN DE SESIÓN ---
     auth.onAuthStateChanged(user => {
         if (user) {
             document.getElementById('login-box').classList.add('hidden');
             document.getElementById('panel-box').classList.remove('hidden');
             startListening();
+            checkAutoSync(); // Inicia la revisión de 24 horas al entrar
         } else {
             document.getElementById('login-box').classList.remove('hidden');
             document.getElementById('panel-box').classList.add('hidden');
@@ -94,26 +98,19 @@
     function handleLogin() {
         const email = document.getElementById('user-email').value;
         const pass = document.getElementById('user-pass').value;
-        const errorDiv = document.getElementById('error-msg');
         auth.signInWithEmailAndPassword(email, pass).catch(err => {
-            errorDiv.innerText = "Acceso denegado en Proyecto Básica";
+            document.getElementById('error-msg').innerText = "Acceso denegado en Proyecto Básica";
         });
     }
 
     function handleLogout() { auth.signOut(); }
 
-    // --- LÓGICA DEL PANEL ---
     function startListening() {
         db.ref('estado_maestro').on('value', snapshot => {
             estadoMaestro = snapshot.val() !== false;
             const btn = document.getElementById('btn-maestro');
-            if (estadoMaestro) {
-                btn.innerText = "🟢 SISTEMA: ACTIVADO";
-                btn.className = "btn btn-green";
-            } else {
-                btn.innerText = "🔴 SISTEMA: PAUSADO";
-                btn.className = "btn btn-red";
-            }
+            btn.innerText = estadoMaestro ? "🟢 SISTEMA: ACTIVADO" : "🔴 SISTEMA: PAUSADO";
+            btn.className = estadoMaestro ? "btn btn-green" : "btn btn-red";
         });
 
         db.ref('timbres').on('value', snapshot => {
@@ -125,24 +122,64 @@
             }
             snapshot.forEach(child => {
                 const t = child.val();
+                const timeStr = `${t.h.toString().padStart(2,'0')}:${t.m.toString().padStart(2,'0')}`;
                 listDiv.innerHTML += `
-                    <div class="toque-item">
-                        <span>${t.h.toString().padStart(2,'0')}:${t.m.toString().padStart(2,'0')}</span>
-                        <button onclick="deleteTime('${child.key}')" style="color:#ef4444; background:none; border:none; cursor:pointer; font-weight:bold;">ELIMINAR</button>
+                    <div class="toque-item" id="item-${child.key}">
+                        <span id="txt-${child.key}">${timeStr}</span>
+                        <div class="actions">
+                            <button class="btn-action" style="color:#8b5cf6;" onclick="showEditForm('${child.key}', '${timeStr}')">EDITAR</button>
+                            <button class="btn-action" style="color:#ef4444;" onclick="deleteTime('${child.key}')">ELIMINAR</button>
+                        </div>
                     </div>`;
             });
         });
     }
 
-    function toggleMaestro() {
-        db.ref('estado_maestro').set(!estadoMaestro);
+    // --- LÓGICA DE AUTO-SINCRONIZACIÓN (CADA 24 HORAS) ---
+    function checkAutoSync() {
+        const lastSync = localStorage.getItem('lastSyncBasica');
+        const now = new Date().getTime();
+        const interval = 24 * 60 * 60 * 1000;
+
+        if (!lastSync || (now - lastSync) > interval) {
+            triggerESP32Update();
+            localStorage.setItem('lastSyncBasica', now);
+            document.getElementById('status-sync').innerText = "Sistema Básica auto-sincronizado.";
+        } else {
+            const horasRestantes = Math.round((interval - (now - lastSync)) / (1000 * 60 * 60));
+            document.getElementById('status-sync').innerText = "Sincronización al día. Próxima en " + horasRestantes + "h.";
+        }
     }
+
+    // Muestra el input para editar
+    function showEditForm(id, currentTime) {
+        const item = document.getElementById(`item-${id}`);
+        item.innerHTML = `
+            <input type="time" id="edit-${id}" class="edit-input" value="${currentTime}">
+            <div class="actions">
+                <button class="btn-action" style="color:#16a34a;" onclick="saveEdit('${id}')">GUARDAR</button>
+                <button class="btn-action" style="color:#64748b;" onclick="startListening()">CANCELAR</button>
+            </div>
+        `;
+    }
+
+    // Guarda edición y avisa al ESP32
+    function saveEdit(id) {
+        const newVal = document.getElementById(`edit-${id}`).value;
+        if (!newVal) return;
+        const [h, m] = newVal.split(':').map(Number);
+        
+        db.ref('timbres/' + id).update({ h, m }).then(() => {
+            triggerESP32Update();
+        });
+    }
+
+    function toggleMaestro() { db.ref('estado_maestro').set(!estadoMaestro); }
 
     function addTime() {
         const val = document.getElementById('nuevo-horario').value;
         if (!val) return;
         const [h, m] = val.split(':').map(Number);
-        // Al agregar, notificamos al ESP32 para que sincronice YA
         db.ref('timbres').push({ h, m }).then(() => {
             triggerESP32Update();
             document.getElementById('nuevo-horario').value = "";
@@ -150,24 +187,20 @@
     }
 
     function deleteTime(id) {
-        if (confirm("¿Eliminar este horario?")) {
-            db.ref('timbres/' + id).remove().then(() => {
-                triggerESP32Update();
-            });
+        if (confirm("¿Eliminar este horario en Básica?")) {
+            db.ref('timbres/' + id).remove().then(() => triggerESP32Update());
         }
     }
 
-    function manualRing() {
-        db.ref('manual').set(true); 
-    }
+    function manualRing() { db.ref('manual').set(true); }
 
-    // Señal para que el ESP32 descargue cambios sin esperar 5 min
     function triggerESP32Update() {
         const d = new Date();
         db.ref('comando_hora').set({
             timestamp: d.getTime(),
             action: "sync_now"
         });
+        localStorage.setItem('lastSyncBasica', new Date().getTime());
     }
 
     function syncRTC() {
@@ -177,4 +210,3 @@
 </script>
 </body>
 </html>
-
