@@ -112,7 +112,7 @@
     <div id="panel-box" class="card hidden">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <button class="btn btn-logout" onclick="handleLogout()">Cerrar Sesión</button>
-            <span style="font-size: 0.8rem; color: var(--slate);">Sistema Basica v8.8</span>
+            <span style="font-size: 0.8rem; color: var(--slate);">Sistema v8.8</span>
         </div>
 
         <div id="online-status" class="offline">VERIFICANDO ESP32...</div>
@@ -137,7 +137,7 @@
 </div>
 
 <script>
-    // CONFIGURACIÓN FIREBASE ACTUALIZADA
+    // CONFIGURACIÓN FIREBASE (ACTUALIZADA)
     const firebaseConfig = {
         apiKey: "AIzaSyAnGzdBBLCTPIbBPg4gbprpSm-mJnkDWSo",
         authDomain: "sistema-timbre-basica.firebaseapp.com",
@@ -212,7 +212,7 @@
             const lastTime = snapshot.val();
             const updateUI = () => {
                 const diff = (Date.now() - lastTime) / 1000;
-                if (diff < 50) {
+                if (diff < 40) {
                     statusDiv.innerText = "DISPOSITIVO: EN LÍNEA";
                     statusDiv.className = "online";
                 } else {
@@ -228,11 +228,11 @@
 
     function forceESP32Update() {
         const ahora = Date.now();
-        // 1. Sincronizar Reloj enviando timestamp y activando comando
-        db.ref().update({
-            "comando_sync": true,
-            "fuerza_hora": ahora
-        });
+        // 1. Sincronizar Reloj
+        db.ref('comando_hora').set({ timestamp: ahora });
+        
+        // 2. ACTIVAR SEÑAL DE ALERTA PARA EL ESP32
+        db.ref('update_pending').set(true);
         
         document.getElementById('status-sync').innerText = "Sincronizando con ESP32...";
         setTimeout(() => {
@@ -277,6 +277,7 @@
 
     function manualRing() { 
         db.ref('manual').set(true); 
+        alert("Toque manual enviado");
     }
 
     function syncSystem() {
