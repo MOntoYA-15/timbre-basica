@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control - Timbre v8.8</title>
+    <title>Panel de Control - Timbre Basica v8.8</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
@@ -39,7 +39,6 @@
 
         h2, h4 { margin-top: 0; color: #1e293b; text-align: center; }
 
-        /* Estado de Conexión */
         #online-status {
             text-align: center;
             font-weight: 700;
@@ -82,7 +81,6 @@
 
         .hidden { display: none; }
         
-        /* Lista de horarios */
         .toque-item { 
             display: flex; 
             justify-content: space-between; 
@@ -112,7 +110,7 @@
     <div id="panel-box" class="card hidden">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <button class="btn btn-logout" onclick="handleLogout()">Cerrar Sesión</button>
-            <span style="font-size: 0.8rem; color: var(--slate);">Sistema v8.8</span>
+            <span style="font-size: 0.8rem; color: var(--slate);">Sistema Basica v8.8</span>
         </div>
 
         <div id="online-status" class="offline">VERIFICANDO ESP32...</div>
@@ -137,12 +135,16 @@
 </div>
 
 <script>
-    // CONFIGURACIÓN FIREBASE
+    // --- NUEVAS CREDENCIALES ACTUALIZADAS ---
     const firebaseConfig = {
-        apiKey: "AIzaSyAbTb-cXeJmmPprRaVTqSyBiEyoEGv93f0",
-        authDomain: "sistematimbre.firebaseapp.com",
-        databaseURL: "https://sistematimbre-default-rtdb.firebaseio.com",
-        projectId: "sistematimbre"
+        apiKey: "AIzaSyAnGzdBBLCTPIbBPg4gbprpSm-mJnkDWSo",
+        authDomain: "sistema-timbre-basica.firebaseapp.com",
+        databaseURL: "https://sistema-timbre-basica-default-rtdb.firebaseio.com",
+        projectId: "sistema-timbre-basica",
+        storageBucket: "sistema-timbre-basica.firebasestorage.app",
+        messagingSenderId: "530042813344",
+        appId: "1:530042813344:web:ac8e4e4d8e69ce7626c2c5",
+        measurementId: "G-PQGGK21991"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -150,6 +152,7 @@
     const db = firebase.database();
     let estadoMaestro = true;
 
+    // Control de Sesión
     auth.onAuthStateChanged(user => {
         if (user) {
             document.getElementById('login-box').classList.add('hidden');
@@ -165,14 +168,14 @@
         const email = document.getElementById('user-email').value;
         const pass = document.getElementById('user-pass').value;
         auth.signInWithEmailAndPassword(email, pass).catch(err => {
-            document.getElementById('error-msg').innerText = "Error de acceso";
+            document.getElementById('error-msg').innerText = "Error: Credenciales inválidas";
         });
     }
 
     function handleLogout() { auth.signOut(); }
 
     function startListening() {
-        // Escuchar Estado Maestro
+        // Escuchar Estado Maestro (Pausa/Activo)
         db.ref('estado_maestro').on('value', snapshot => {
             estadoMaestro = snapshot.val() !== false;
             const btn = document.getElementById('btn-maestro');
@@ -180,12 +183,12 @@
             btn.className = estadoMaestro ? "btn btn-green" : "btn btn-red";
         });
 
-        // Escuchar Horarios
+        // Escuchar Lista de Horarios
         db.ref('timbres').on('value', snapshot => {
             const listDiv = document.getElementById('lista-toques');
             listDiv.innerHTML = '';
             if (!snapshot.exists()) {
-                listDiv.innerHTML = '<p style="text-align:center; color:#94a3b8; padding:10px;">No hay horarios</p>';
+                listDiv.innerHTML = '<p style="text-align:center; color:#94a3b8; padding:10px;">No hay horarios guardados</p>';
                 return;
             }
             snapshot.forEach(child => {
@@ -202,14 +205,14 @@
             });
         });
 
-        // Heartbeat (Detección de ESP32 en línea)
+        // Heartbeat (Estado del ESP32)
         db.ref('ultima_conexion').on('value', snapshot => {
             const statusDiv = document.getElementById('online-status');
             const lastTime = snapshot.val();
             const updateUI = () => {
                 const diff = (Date.now() - lastTime) / 1000;
-                if (diff < 40) {
-                    statusDiv.innerText = "DISPOSITIVO: EN LÍNEA";
+                if (diff < 45) { // Si actualizó hace menos de 45 segundos
+                    statusDiv.innerText = "📡 DISPOSITIVO: EN LÍNEA";
                     statusDiv.className = "online";
                 } else {
                     statusDiv.innerText = "🔌 DISPOSITIVO: FUERA DE LÍNEA";
@@ -223,34 +226,29 @@
     }
 
     function forceESP32Update() {
-        const ahora = Date.now();
-        // 1. Sincronizar Reloj
-        db.ref('comando_hora').set({ timestamp: ahora });
-        
-        // 2. ACTIVAR SEÑAL DE ALERTA PARA EL ESP32
-        db.ref('update_pending').set(true);
-        
-        document.getElementById('status-sync').innerText = "Sincronizando con ESP32...";
+        db.ref('comando_sync').set(true);
+        document.getElementById('status-sync').innerText = "Sincronizando...";
         setTimeout(() => {
-            document.getElementById('status-sync').innerText = "Cambios enviados.";
-        }, 3000);
+            document.getElementById('status-sync').innerText = "Conexión establecida.";
+        }, 2000);
     }
 
-    function toggleMaestro() { db.ref('estado_maestro').set(!estadoMaestro); }
+    function toggleMaestro() { 
+        db.ref('estado_maestro').set(!estadoMaestro); 
+    }
 
     function addTime() {
         const val = document.getElementById('nuevo-horario').value;
         if (!val) return;
         const [h, m] = val.split(':').map(Number);
         db.ref('timbres').push({ h, m }).then(() => {
-            forceESP32Update();
             document.getElementById('nuevo-horario').value = "";
         });
     }
 
     function deleteTime(id) {
-        if (confirm("¿Borrar horario?")) {
-            db.ref('timbres/' + id).remove().then(() => forceESP32Update());
+        if (confirm("¿Deseas eliminar este horario?")) {
+            db.ref('timbres/' + id).remove();
         }
     }
 
@@ -268,12 +266,11 @@
         const newVal = document.getElementById(`edit-${id}`).value;
         if (!newVal) return;
         const [h, m] = newVal.split(':').map(Number);
-        db.ref('timbres/' + id).update({ h, m }).then(() => forceESP32Update());
+        db.ref('timbres/' + id).update({ h, m });
     }
 
     function manualRing() { 
         db.ref('manual').set(true); 
-        alert("Toque manual enviado");
     }
 
     function syncSystem() {
